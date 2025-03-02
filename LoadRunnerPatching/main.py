@@ -1,0 +1,150 @@
+import streamlit as st
+import os
+
+# Inject custom CSS to modify the Streamlit header
+custom_css = """
+    <style>
+        /* Hide Streamlit's default deploy button & menu */
+        #MainMenu {visibility: hidden;}
+        header [data-testid="stToolbar"] {display: none;}
+        footer {visibility: hidden;}
+
+        /* Hide the default multi-page navigation sidebar */
+        [data-testid="stSidebarNav"] {display: none;}
+
+        /* Remove extra padding/margin at the top */
+        .stApp {
+            margin-top: -4rem;
+        }
+
+        /* Custom Header Styling */
+        header.stAppHeader {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background-color: #00274E; /* Dark blue header */
+            color: white;
+            padding: 10px;
+            width: 100%;
+            height: 60px;
+            position: fixed;
+            top: 0;
+            left: 0;
+            z-index: 1000;
+        }
+
+        header.stAppHeader img {
+            height: 40px;
+            margin-right: 15px;
+        }
+
+        header.stAppHeader h1 {
+            flex-grow: 1;
+            text-align: center;
+            margin: 0;
+            font-size: 20px;
+        }
+
+        /* Push content down so it's not covered by fixed header */
+        .block-container {
+            padding-top: 70px;
+        }
+
+        /* Sidebar Styling */
+        section[data-testid="stSidebar"] {
+            background-color: #00274E !important; /* Dark blue */
+            color: white !important;
+        }
+
+        /* Change text color inside sidebar */
+        section[data-testid="stSidebar"] * {
+            color: white !important;
+        }
+
+        /* Sidebar radio buttons */
+        div.stRadio > label {
+            color: white !important;
+        }
+
+        /* Sidebar Title */
+        section[data-testid="stSidebar"] h1, 
+        section[data-testid="stSidebar"] h2, 
+        section[data-testid="stSidebar"] h3, 
+        section[data-testid="stSidebar"] h4 {
+            color: white !important;
+        }
+
+
+        /* Adjust main content position */
+        .block-container {
+            margin-top: 200px !important;  /* Push content down */
+            margin-left: 20px !important; /* Align content after sidebar */
+            padding: 20px;
+        }
+
+    </style>
+"""
+
+
+# # Read the local CSS file
+# def load_css(file_name):
+#     with open(file_name, "r") as f:
+#         return f"<style>{f.read()}</style>"
+
+# # Load and apply custom CSS
+# st.markdown(load_css("static/styles.css"), unsafe_allow_html=True)
+
+# Apply custom CSS
+st.markdown(custom_css, unsafe_allow_html=True)
+
+# Injecting the header inside Streamlit's built-in header
+st.markdown(
+    """
+    <header class="stAppHeader">
+        <img src="https://via.placeholder.com/40" alt="Company Logo">
+        <h1>Performance Engineering Service - One Stop Solution</h1>
+    </header>
+    """,
+    unsafe_allow_html=True
+)
+
+# Sidebar navigation
+with st.sidebar:
+    st.title("Navigation")
+    page = st.radio("Go to", ["Home", "Fiddler to JMeter", "HAR to JMeter", "Postman to JMeter",
+                               "Postman to LoadRunner", "Settings", "Upload Process"])
+
+# **Get the absolute path of the "pages" folder**
+pages_dir = os.path.join(os.path.dirname(__file__), "pages")
+
+# **Dynamically load the selected script**
+def load_page(script_name):
+    script_path = os.path.join(pages_dir, script_name)
+    if os.path.exists(script_path):  # Check if the file exists before executing
+        with open(script_path, "r", encoding="utf-8") as file:
+            exec(file.read(), globals())  # Execute the script content safely
+    else:
+        st.error(f"🚨 Error: `{script_name}` not found in `pages/` folder.")
+
+# **Render the selected page**
+if page == "Home":
+    st.title("🏠 Welcome to Performance Engineering Service - One Stop Solution")
+    st.write("Navigate using the sidebar to process different functionalities.")
+
+elif page == "Fiddler to JMeter":
+    load_page("fiddler_to_jmeter.py")
+
+elif page == "HAR to JMeter":
+    load_page("har_to_jmeter.py")
+
+elif page == "Postman to JMeter":
+    load_page("postman_to_jmeter.py")
+
+elif page == "Postman to LoadRunner":
+    load_page("postman_to_loadrunner.py")
+
+elif page == "Settings":
+    load_page("setting.py")
+
+elif page == "Upload Process":
+    load_page("upload_process.py")

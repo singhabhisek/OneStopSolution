@@ -1,0 +1,93 @@
+   lr_start_transaction("POST Request with JSON Body Bearer");
+
+    web_custom_request("POST Request with JSON Body Bearer",
+        "URL=https://api.example.com/post-json",
+        "Method=POST",
+        "Resource=0",
+        "RecContentType=application/json",
+        "Referer=",
+        "Snapshot=t2.inf",
+        "Mode=HTML",
+        "EncType=application/json",
+        "Body={  \"PlaceOrderRequest\": {    \"Order\": {      \"OrderID\": \"12345\",      \"Customer\": {        \"CustomerID\": \"7890\",        \"CustomerName\": \"John Doe\",        \"Email\": \"johndoe@example.com\"      },      \"Items\": [        {          \"ItemID\": \"101\",          \"ItemName\": \"Laptop\",          \"Quantity\": 1,          \"Price\": 1500.00        },        {          \"ItemID\": \"102\",          \"ItemName\": \"Mouse\",          \"Quantity\": 2,          \"Price\": 25.00        }      ],      \"ShippingAddress\": {        \"Street\": \"123 Main St\",        \"City\": \"Los Angeles\",        \"State\": \"CA\",        \"ZipCode\": \"90001\"      }    }  }}",
+        LAST);
+    
+   lr_end_transaction("POST Request with JSON Body Bearer",LR_AUTO);
+
+   lr_start_transaction("POST Request with SOAP Body");
+
+    web_custom_request("POST Request with SOAP Body",
+        "URL=https://api.example.com/post-soap",
+        "Method=POST",
+        "Resource=0",
+        "RecContentType=application/json",
+        "Referer=",
+        "Snapshot=t3.inf",
+        "Mode=HTML",
+        "EncType=application/json",
+        "Body=<?xml version=\"1.0\" encoding=\"utf-8\"?>
+<soapenv:Envelope xmlns:soapenv=\"http://schemas.xmlsoap.org/soap/envelope/\" xmlns:web=\"http://www.example.com/webservices/\">
+   <soapenv:Header/>
+   <soapenv:Body>
+      <web:YourRequest>
+         <web:Parameter1>Value1</web:Parameter1>
+         <web:Parameter2>Value2</web:Parameter2>
+      </web:YourRequest>
+   </soapenv:Body>
+</soapenv:Envelope>",
+        LAST);
+    
+   lr_end_transaction("POST Request with SOAP Body",LR_AUTO);
+
+   lr_start_transaction("POST Request with SOAP Body_Other");
+
+    web_custom_request("POST Request with SOAP Body_Other",
+        "URL=https://api.example.com/post-soap",
+        "Method=POST",
+        "Resource=0",
+        "RecContentType=application/json",
+        "Referer=",
+        "Snapshot=t5.inf",
+        "Mode=HTML",
+        "EncType=application/json",
+        "Body=<?xml version=\"1.0\" encoding=\"UTF-8\"?>
+<soapenv:Envelope xmlns:soapenv=\"http://schemas.xmlsoap.org/soap/envelope/\" xmlns:ord=\"http://example.com/order\">
+   <soapenv:Header/>
+   <soapenv:Body>
+      <ord:PlaceOrderRequest>
+         <ord:Order>
+            <ord:OrderID>12345</ord:OrderID>
+            <ord:Customer>
+               <ord:CustomerID>7890</ord:CustomerID>
+               <ord:CustomerName>John Doe</ord:CustomerName>
+               <ord:Email>johndoe@example.com</ord:Email>
+            </ord:Customer>
+            <ord:Items>
+               <ord:Item>
+                  <ord:ItemID>101</ord:ItemID>
+                  <ord:ItemName>Laptop</ord:ItemName>
+                  <ord:Quantity>1</ord:Quantity>
+                  <ord:Price>1500.00</ord:Price>
+               </ord:Item>
+               <ord:Item>
+                  <ord:ItemID>102</ord:ItemID>
+                  <ord:ItemName>Mouse</ord:ItemName>
+                  <ord:Quantity>2</ord:Quantity>
+                  <ord:Price>25.00</ord:Price>
+               </ord:Item>
+            </ord:Items>
+            <ord:ShippingAddress>
+               <ord:Street>123 Main St</ord:Street>
+               <ord:City>Los Angeles</ord:City>
+               <ord:State>CA</ord:State>
+               <ord:ZipCode>90001</ord:ZipCode>
+            </ord:ShippingAddress>
+         </ord:Order>
+      </ord:PlaceOrderRequest>
+   </soapenv:Body>
+</soapenv:Envelope>
+",
+        LAST);
+    
+   lr_end_transaction("POST Request with SOAP Body_Other",LR_AUTO);
+

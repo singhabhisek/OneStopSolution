@@ -1,0 +1,201 @@
+{
+	"info": {
+		"_postman_id": "0f8130d3-b3b0-410a-a261-aae1e013f011",
+		"name": "Sample Collection",
+		"description": "A sample Postman collection with various request types",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+		"_exporter_id": "38107747"
+	},
+	"item": [
+		{
+			"name": "GET Request with Query Parameters",
+			"request": {
+				"method": "GET",
+				"header": [],
+				"url": {
+					"raw": "https://api.example.com/get-with-query?param1=value1&param2=value2",
+					"protocol": "https",
+					"host": [
+						"api",
+						"example",
+						"com"
+					],
+					"path": [
+						"get-with-query"
+					],
+					"query": [
+						{
+							"key": "param1",
+							"value": "value1"
+						},
+						{
+							"key": "param2",
+							"value": "value2"
+						}
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "POST Request with JSON Body Bearer",
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "application/json"
+					},
+					{
+						"key": "Authorization",
+						"value": "Bearer YOUR_TOKEN_HERE"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\r\n  \"PlaceOrderRequest\": {\r\n    \"Order\": {\r\n      \"OrderID\": \"12345\",\r\n      \"Customer\": {\r\n        \"CustomerID\": \"7890\",\r\n        \"CustomerName\": \"John Doe\",\r\n        \"Email\": \"johndoe@example.com\"\r\n      },\r\n      \"Items\": [\r\n        {\r\n          \"ItemID\": \"101\",\r\n          \"ItemName\": \"Laptop\",\r\n          \"Quantity\": 1,\r\n          \"Price\": 1500.00\r\n        },\r\n        {\r\n          \"ItemID\": \"102\",\r\n          \"ItemName\": \"Mouse\",\r\n          \"Quantity\": 2,\r\n          \"Price\": 25.00\r\n        }\r\n      ],\r\n      \"ShippingAddress\": {\r\n        \"Street\": \"123 Main St\",\r\n        \"City\": \"Los Angeles\",\r\n        \"State\": \"CA\",\r\n        \"ZipCode\": \"90001\"\r\n      }\r\n    }\r\n  }\r\n}\r\n",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "https://api.example.com/post-json",
+					"protocol": "https",
+					"host": [
+						"api",
+						"example",
+						"com"
+					],
+					"path": [
+						"post-json"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "POST Request with SOAP Body",
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "text/xml"
+					},
+					{
+						"key": "SOAPAction",
+						"value": "urn:yourSoapAction"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "<?xml version=\"1.0\" encoding=\"utf-8\"?>\n<soapenv:Envelope xmlns:soapenv=\"http://schemas.xmlsoap.org/soap/envelope/\" xmlns:web=\"http://www.example.com/webservices/\">\n   <soapenv:Header/>\n   <soapenv:Body>\n      <web:YourRequest>\n         <web:Parameter1>Value1</web:Parameter1>\n         <web:Parameter2>Value2</web:Parameter2>\n      </web:YourRequest>\n   </soapenv:Body>\n</soapenv:Envelope>"
+				},
+				"url": {
+					"raw": "https://api.example.com/post-soap",
+					"protocol": "https",
+					"host": [
+						"api",
+						"example",
+						"com"
+					],
+					"path": [
+						"post-soap"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "GET Request with Headers Copy",
+			"protocolProfileBehavior": {
+				"disableBodyPruning": true
+			},
+			"request": {
+				"method": "GET",
+				"header": [
+					{
+						"key": "Accept",
+						"value": "application/json"
+					},
+					{
+						"key": "Authorization",
+						"value": "Bearer YOUR_TOKEN_HERE"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\r\n<LoginRequest>\r\n   <Username>john_doe</Username>\r\n   <Password>password123</Password>\r\n</LoginRequest>\r\n",
+					"options": {
+						"raw": {
+							"language": "xml"
+						}
+					}
+				},
+				"url": {
+					"raw": "https://api.example.com/get-with-headers",
+					"protocol": "https",
+					"host": [
+						"api",
+						"example",
+						"com"
+					],
+					"path": [
+						"get-with-headers"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "POST Request with SOAP Body_Other",
+			"request": {
+				"auth": {
+					"type": "basic",
+					"basic": [
+						{
+							"key": "password",
+							"value": "test123",
+							"type": "string"
+						},
+						{
+							"key": "username",
+							"value": "test",
+							"type": "string"
+						}
+					]
+				},
+				"method": "POST",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "text/xml"
+					},
+					{
+						"key": "SOAPAction",
+						"value": "urn:yourSoapAction"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<soapenv:Envelope xmlns:soapenv=\"http://schemas.xmlsoap.org/soap/envelope/\" xmlns:ord=\"http://example.com/order\">\n   <soapenv:Header/>\n   <soapenv:Body>\n      <ord:PlaceOrderRequest>\n         <ord:Order>\n            <ord:OrderID>12345</ord:OrderID>\n            <ord:Customer>\n               <ord:CustomerID>7890</ord:CustomerID>\n               <ord:CustomerName>John Doe</ord:CustomerName>\n               <ord:Email>johndoe@example.com</ord:Email>\n            </ord:Customer>\n            <ord:Items>\n               <ord:Item>\n                  <ord:ItemID>101</ord:ItemID>\n                  <ord:ItemName>Laptop</ord:ItemName>\n                  <ord:Quantity>1</ord:Quantity>\n                  <ord:Price>1500.00</ord:Price>\n               </ord:Item>\n               <ord:Item>\n                  <ord:ItemID>102</ord:ItemID>\n                  <ord:ItemName>Mouse</ord:ItemName>\n                  <ord:Quantity>2</ord:Quantity>\n                  <ord:Price>25.00</ord:Price>\n               </ord:Item>\n            </ord:Items>\n            <ord:ShippingAddress>\n               <ord:Street>123 Main St</ord:Street>\n               <ord:City>Los Angeles</ord:City>\n               <ord:State>CA</ord:State>\n               <ord:ZipCode>90001</ord:ZipCode>\n            </ord:ShippingAddress>\n         </ord:Order>\n      </ord:PlaceOrderRequest>\n   </soapenv:Body>\n</soapenv:Envelope>\n"
+				},
+				"url": {
+					"raw": "https://api.example.com/post-soap",
+					"protocol": "https",
+					"host": [
+						"api",
+						"example",
+						"com"
+					],
+					"path": [
+						"post-soap"
+					]
+				}
+			},
+			"response": []
+		}
+	]
+}

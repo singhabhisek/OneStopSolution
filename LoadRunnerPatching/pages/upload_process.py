@@ -1,0 +1,124 @@
+import streamlit as st
+import os
+import shutil
+import zipfile
+import subprocess
+from io import BytesIO
+
+# Get absolute path of the script directory
+SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+DT_SCRIPT_PATH = os.path.join(SCRIPT_DIR, "../scripts/Dt-LoadRunner-request-tagging.py")
+
+# Define directories
+INPUT_DIR = os.path.join(SCRIPT_DIR, "../tempScriptsInput")
+OUTPUT_DIR = os.path.join(SCRIPT_DIR, "../tempScriptsOutput")
+
+
+# Hide Streamlit menu, deploy button, and footer
+hide_streamlit_style = """
+    <style>
+        #MainMenu {visibility: hidden;}  /* Hides the top-right menu */
+        footer {visibility: hidden;}  /* Hides the footer */
+        header {visibility: hidden;}  /* Hides the deploy/share button */
+    </style>
+"""
+st.markdown(hide_streamlit_style, unsafe_allow_html=True)
+
+# Ensure clean directories
+os.makedirs(INPUT_DIR, exist_ok=True)
+os.makedirs(OUTPUT_DIR, exist_ok=True)
+
+st.title("LoadRunner Script Processor")
+st.write("Upload a ZIP file containing LoadRunner script folders, select INSERT/DELETE, and process.")
+
+# File uploader (ZIP only)
+uploaded_file = st.file_uploader("Upload ZIP file with LoadRunner scripts", type="zip")
+
+# User selects INSERT or DELETE
+action = st.radio("Select action", ("INSERT", "DELETE"))
+
+# Process button
+if st.button("Process Files"):
+    if not uploaded_file:
+        st.error("Please upload a ZIP file.")
+    else:
+        # Clear previous input/output directories
+        shutil.rmtree(INPUT_DIR, ignore_errors=True)
+        shutil.rmtree(OUTPUT_DIR, ignore_errors=True)
+        os.makedirs(INPUT_DIR, exist_ok=True)
+        os.makedirs(OUTPUT_DIR, exist_ok=True)
+
+        # Save and extract ZIP file
+        zip_path = os.path.join(INPUT_DIR, "uploaded_scripts.zip")
+        with open(zip_path, "wb") as f:
+            f.write(uploaded_file.getbuffer())
+
+        with zipfile.ZipFile(zip_path, "r") as zip_ref:
+            zip_ref.extractall(INPUT_DIR)
+
+        # Verify extracted folder structure
+        extracted_folders = [f for f in os.listdir(INPUT_DIR) if os.path.isdir(os.path.join(INPUT_DIR, f))]
+        if not extracted_folders:
+            st.error("No valid LoadRunner script folders found in ZIP.")
+            st.stop()
+
+        # Run LoadRunner patching script using absolute path
+        try:
+            result = subprocess.run(
+                ["python", DT_SCRIPT_PATH, INPUT_DIR, action], 
+                capture_output=True, text=True, check=True
+            )
+            # Hide full paths and show only relevant folder names
+            output = result.stdout.replace(INPUT_DIR, "").replace("\\", "/")  # Normalize slashes
+            error_output = result.stderr.replace(INPUT_DIR, "").replace("\\", "/")
+            st.text_area("Processing Output", output)
+            st.text_area("Processing Errors", error_output)
+        except subprocess.CalledProcessError as e:
+            st.error(f"Error while processing: {e}")
+            error_output = e.stderr.replace(INPUT_DIR, "").replace("\\", "/")
+            st.text_area("Error Details", error_output)
+            st.stop()
+
+        # Move processed folders from tempScriptsInput to tempScriptsOutput
+        for folder in extracted_folders:
+            src = os.path.join(INPUT_DIR, folder)
+            dest = os.path.join(OUTPUT_DIR, folder)
+            shutil.move(src, dest)
+
+        # Create ZIP of processed files
+        zip_buffer = BytesIO()
+        with zipfile.ZipFile(zip_buffer, "w", zipfile.ZIP_DEFLATED) as zipf:
+            for root, _, files in os.walk(OUTPUT_DIR):
+                for file in files:
+                    file_path = os.path.join(root, file)
+                    zipf.write(file_path, os.path.relpath(file_path, OUTPUT_DIR))
+
+        # Provide download link
+        st.success("Processing complete! Download the patched scripts below.")
+        st.download_button(
+            label="Download Processed Scripts",
+            data=zip_buffer.getvalue(),
+            file_name="patched_loadrunner_scripts.zip",
+            mime="application/zip",
+            key="download_button"
+        )
+
+# st.markdown(
+#             """
+#             <style>
+#             div.stButton > button:first-child {
+#                 background-color: #4CAF50; /* Green */
+#                 color: white;
+#                 font-size: 16px;
+#                 padding: 10px 24px;
+#                 border-radius: 5px;
+#                 border: none;
+#                 cursor: pointer;
+#             }
+#             div.stButton > button:first-child:hover {
+#                 background-color: #45a049;
+#             }
+#             </style>
+#             """,
+#             unsafe_allow_html=True
+#         )

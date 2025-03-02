@@ -1,0 +1,167 @@
+import json
+from xml.etree.ElementTree import Element, SubElement, tostring
+import sys
+
+from xml.dom.minidom import parseString
+
+def create_jmeter_testplan(har_data, exclude_extensions):
+    # Root element
+    testplan = Element('jmeterTestPlan', version='1.2', properties='5.0', jmeter='5.5')
+    hash_tree = SubElement(testplan, 'hashTree')
+    
+    # Test Plan
+    test_plan = SubElement(hash_tree, 'TestPlan', guiclass='TestPlanGui', testclass='TestPlan', testname='Blazemeter test plan', enabled='true')
+    SubElement(test_plan, 'stringProp', name='TestPlan.comments').text = 'This test plan was created by the BlazeMeter converter v.${project.version}. Please contact support@blazemeter.com for further support.'
+    SubElement(test_plan, 'boolProp', name='TestPlan.functional_mode').text = 'false'
+    SubElement(test_plan, 'boolProp', name='TestPlan.serialize_threadgroups').text = 'false'
+    collection_prop = SubElement(test_plan, 'elementProp', name='TestPlan.user_defined_variables', elementType='Arguments', guiclass='ArgumentsPanel', testclass='Arguments', enabled='true')
+    SubElement(collection_prop, 'collectionProp', name='Arguments.arguments')
+    SubElement(test_plan, 'stringProp', name='TestPlan.user_define_classpath')
+    
+    tg_hash_tree = SubElement(hash_tree, 'hashTree')
+    
+    # Adding Thread Group
+    thread_group = SubElement(tg_hash_tree, 'ThreadGroup', guiclass='ThreadGroupGui', testclass='ThreadGroup', testname='Thread Group', enabled='true')
+    SubElement(thread_group, 'stringProp', name='ThreadGroup.on_sample_error').text = 'continue'
+    main_controller = SubElement(thread_group, 'elementProp', name='ThreadGroup.main_controller', elementType='LoopController', guiclass='LoopControlPanel', testclass='LoopController', enabled='true')
+    SubElement(main_controller, 'boolProp', name='LoopController.continue_forever').text = 'false'
+    SubElement(main_controller, 'stringProp', name='LoopController.loops').text = '1'
+    SubElement(thread_group, 'stringProp', name='ThreadGroup.num_threads').text = '1'
+    SubElement(thread_group, 'stringProp', name='ThreadGroup.ramp_time').text = '1'
+    SubElement(thread_group, 'boolProp', name='ThreadGroup.scheduler').text = 'false'
+    SubElement(thread_group, 'stringProp', name='ThreadGroup.duration').text = '0'
+    SubElement(thread_group, 'stringProp', name='ThreadGroup.delay').text = '0'
+    SubElement(thread_group, 'boolProp', name='ThreadGroup.same_user_on_next_iteration').text = 'true'
+
+    tg_hash_tree_inner = SubElement(tg_hash_tree, 'hashTree')
+
+    # Adding HeaderManager
+    header_manager = SubElement(tg_hash_tree_inner, 'HeaderManager', guiclass='HeaderPanel', testclass='HeaderManager', testname='HTTP Header Manager', enabled='true')
+    header_collection = SubElement(header_manager, 'collectionProp', name='HeaderManager.headers')
+    headers = [
+        {'user-agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/132.0.0.0 Safari/537.36'}
+    ]
+    for header in headers:
+        for key, value in header.items():
+            header_element = SubElement(header_collection, 'elementProp', name=key, elementType='Header')
+            SubElement(header_element, 'stringProp', name='Header.name').text = key
+            SubElement(header_element, 'stringProp', name='Header.value').text = value
+
+    SubElement(tg_hash_tree_inner, 'hashTree')
+
+    # Adding CookieManager
+    cookie_manager = SubElement(tg_hash_tree_inner, 'CookieManager', guiclass='CookiePanel', testclass='CookieManager', testname='HTTP Cookie Manager', enabled='true')
+    SubElement(cookie_manager, 'collectionProp', name='CookieManager.cookies')
+    SubElement(cookie_manager, 'boolProp', name='CookieManager.clearEachIteration').text = 'false'
+    SubElement(cookie_manager, 'boolProp', name='CookieManager.controlledByThreadGroup').text = 'false'
+    SubElement(tg_hash_tree_inner, 'hashTree')
+
+    # Adding CacheManager
+    cache_manager = SubElement(tg_hash_tree_inner, 'CacheManager', guiclass='CacheManagerGui', testclass='CacheManager', testname='HTTP Cache Manager', enabled='true')
+    SubElement(cache_manager, 'boolProp', name='clearEachIteration').text = 'false'
+    SubElement(cache_manager, 'boolProp', name='useExpires').text = 'true'
+    tg_hash_tree_inner_cache = SubElement(tg_hash_tree_inner, 'hashTree')
+
+
+    # Exclude static content
+    exclude_list = exclude_extensions.split(";")
+
+    # Adding HTTPSamplerProxy elements from HAR entries
+    for entry in har_data['log']['entries']:
+        request = entry['request']
+        url = request['url']
+
+        if any(url.endswith(ext) for ext in exclude_list):
+            continue  # Skip static files
+        
+        http_sampler = SubElement(tg_hash_tree_inner, 'HTTPSamplerProxy', guiclass='HttpTestSampleGui', testclass='HTTPSamplerProxy', testname=request['url'], enabled='true')
+        
+        element_prop = SubElement(http_sampler, 'elementProp', name='HTTPsampler.Arguments', elementType='Arguments', guiclass='HTTPArgumentsPanel', testclass='Arguments', enabled='true')
+        args_collection = SubElement(element_prop, 'collectionProp', name='Arguments.arguments')
+        
+        if 'postData' in request and 'params' in request['postData']:
+            for param in request['postData']['params']:
+                arg_element = SubElement(args_collection, 'elementProp', name=param['name'], elementType='HTTPArgument')
+                SubElement(arg_element, 'boolProp', name='HTTPArgument.always_encode').text = 'true'
+                SubElement(arg_element, 'stringProp', name='Argument.name').text = param['name']
+                SubElement(arg_element, 'stringProp', name='Argument.value').text = param['value']
+                SubElement(arg_element, 'stringProp', name='Argument.metadata').text = '='
+                SubElement(arg_element, 'boolProp', name='HTTPArgument.use_equals').text = 'true'
+        
+        SubElement(http_sampler, 'stringProp', name='HTTPSampler.domain').text = request['url'].split('/')[2].split(':')[0]
+        port = request['url'].split('/')[2].split(':')[1] if ':' in request['url'].split('/')[2] else ''
+        SubElement(http_sampler, 'stringProp', name='HTTPSampler.port').text = port
+        SubElement(http_sampler, 'stringProp', name='HTTPSampler.protocol').text = request['url'].split(':')[0]
+        SubElement(http_sampler, 'stringProp', name='HTTPSampler.contentEncoding')
+        SubElement(http_sampler, 'stringProp', name='HTTPSampler.path').text = '/' + '/'.join(request['url'].split('/')[3:])
+        SubElement(http_sampler, 'stringProp', name='HTTPSampler.method').text = request['method']
+        SubElement(http_sampler, 'boolProp', name='HTTPSampler.follow_redirects').text = 'true'
+        SubElement(http_sampler, 'boolProp', name='HTTPSampler.auto_redirects').text = 'false'
+        SubElement(http_sampler, 'boolProp', name='HTTPSampler.use_keepalive').text = 'true'
+        SubElement(http_sampler, 'boolProp', name='HTTPSampler.DO_MULTIPART_POST').text = 'false'
+        SubElement(http_sampler, 'stringProp', name='HTTPSampler.embedded_url_re')
+        SubElement(http_sampler, 'stringProp', name='HTTPSampler.connect_timeout')
+        SubElement(http_sampler, 'stringProp', name='HTTPSampler.response_timeout')
+
+        tg_hash_tree_sampler = SubElement(tg_hash_tree_inner, 'hashTree')
+        
+        # Adding HeaderManager for each HTTPSamplerProxy
+        header_manager = SubElement(tg_hash_tree_sampler, 'HeaderManager', guiclass='HeaderPanel', testclass='HeaderManager', testname='HTTP Header manager', enabled='true')
+        header_collection = SubElement(header_manager, 'collectionProp', name='HeaderManager.headers')
+        for header in request['headers']:
+            header_element = SubElement(header_collection, 'elementProp', name=header['name'], elementType='Header')
+            SubElement(header_element, 'stringProp', name='Header.name').text = header['name']
+            SubElement(header_element, 'stringProp', name='Header.value').text = header['value']
+        
+        SubElement(tg_hash_tree_sampler, 'hashTree')
+
+        # Adding ResponseAssertion for each HTTPSamplerProxy
+        response_assertion = SubElement(tg_hash_tree_sampler, 'ResponseAssertion', guiclass='AssertionGui', testclass='ResponseAssertion', testname='Response Assertion', enabled='true')
+        assertion_strings = SubElement(response_assertion, 'collectionProp', name='Asserion.test_strings')
+        SubElement(assertion_strings, 'stringProp', name='49586').text = '200'
+        SubElement(response_assertion, 'stringProp', name='Assertion.test_field').text = 'Assertion.response_code'
+        SubElement(response_assertion, 'boolProp', name='Assertion.assume_success').text = 'false'
+        SubElement(response_assertion, 'intProp', name='Assertion.test_type').text = '2'  # 2 = contains
+        SubElement(response_assertion, 'boolProp', name='Assertion.not').text = 'false'
+        SubElement(response_assertion, 'stringProp', name='Assertion.custom_message')
+        
+        SubElement(tg_hash_tree_sampler, 'hashTree')
+
+    return testplan
+
+# # Load HAR file
+# with open('sample.har', 'r') as har_file:
+#     har_data = json.load(har_file)
+
+# # Create JMeter test plan
+# testplan = create_jmeter_testplan(har_data)
+
+# # Save to file
+# with open('testplan.jmx', 'wb') as jmx_file:
+#     jmx_file.write(parseString(tostring(testplan)).toprettyxml(encoding='utf-8'))
+
+
+def main():
+    if len(sys.argv) < 4:
+        print("Usage: python har2jmxengine.py <har_file> <exclude_extensions> <output_jmx>")
+        sys.exit(1)
+
+    har_file = sys.argv[1]
+    exclude_extensions = sys.argv[2]
+    output_jmx = sys.argv[3]
+
+    # Load HAR file
+    with open(har_file, "r", encoding="utf-8") as f:
+        har_data = json.load(f)
+
+    # Create JMeter test plan
+    testplan = create_jmeter_testplan(har_data, exclude_extensions)
+
+    # Save to JMX file
+    with open(output_jmx, "wb") as f:
+        f.write(parseString(tostring(testplan)).toprettyxml(encoding="utf-8"))
+
+    print("JMeter test plan saved:", output_jmx)
+
+if __name__ == "__main__":
+    main()
