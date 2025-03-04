@@ -1,3 +1,4 @@
+import base64
 import streamlit as st
 import os
 
@@ -97,11 +98,36 @@ custom_css = """
 # Apply custom CSS
 st.markdown(custom_css, unsafe_allow_html=True)
 
-# Injecting the header inside Streamlit's built-in header
+
+# Function to encode an image to Base64
+def get_base64_image(image_path):
+    with open(image_path, "rb") as img_file:
+        return base64.b64encode(img_file.read()).decode()
+    
+logo_url = "D:\\Desktop 2024\\PycharmProjects\\RESTAPI\\LoadRunnerPatching\\static\\truist.png"  # Replace with actual logo URL
+st.image(logo_url, width=200)  # Adjust width as needed
+image_base64 = get_base64_image(logo_url)  # Ensure "logo.png" exists in the same folder
+
+
+# st.text(get_base64_image(logo_url)[:100])  # Print only first 100 characters
+
+# # Injecting the header inside Streamlit's built-in header
+# st.markdown(
+#     """
+#     <header class="stAppHeader">
+#         <img src="data:image/png;base64,{image_base64}" alt="Company Logo">
+#         <h1>Performance Engineering Service - One Stop Solution</h1>
+#     </header>
+#     """,
+#     unsafe_allow_html=True
+# )
+
+
+# Inject the Custom Header with Base64 Image
 st.markdown(
-    """
+    f"""
     <header class="stAppHeader">
-        <img src="https://via.placeholder.com/40" alt="Company Logo">
+        <img src="data:image/png;base64,{image_base64}" alt="Company Logo">
         <h1>Performance Engineering Service - One Stop Solution</h1>
     </header>
     """,
