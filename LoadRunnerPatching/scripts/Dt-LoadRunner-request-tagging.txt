@@ -70,50 +70,60 @@ def is_commented(line):
     return line.strip().startswith("//") or "/*" in line or "*/" in line  # Check for comment markers
 
 # Function to process a `.c` file and either insert or delete Dynatrace headers
-def process_c_file(file_path, lsn_name, action):
+# Process C file for INSERT or DELETE action
+def process_c_file(file_path, lsn_name, action, include_transaction_name="FALSE"):
     with open(file_path, 'r') as file:
-        content = file.readlines()  # Read all lines from the file
+        content = file.readlines()
 
-    new_content = []  # List to store modified file content
-    transaction_name = None  # Store current transaction name
-    inside_comment = False  # Track whether inside a block comment
+    new_content = []
+    transaction_name = None
+    request_counter = 0  # Counter for requests within a transaction
+    inside_comment = False
 
-    for i, line in enumerate(content):  # Loop through each line in the file
+    for i, line in enumerate(content):
         if '/*' in line:
-            inside_comment = True  # Start of a multi-line comment block
+            inside_comment = True
         if '*/' in line:
-            inside_comment = False  # End of a multi-line comment block
+            inside_comment = False
             new_content.append(line)
             continue
         
-        if inside_comment or is_commented(line):  # Skip commented lines
+        if inside_comment or is_commented(line):
             new_content.append(line)
             continue
 
-        # Check if this line starts a LoadRunner transaction
+        # Detect transaction start
         transaction_match = re.search(r'lr_start_transaction\("([^"]+)"\);', line)
         if transaction_match:
-            transaction_name = transaction_match.group(1)  # Store the transaction name
+            transaction_name = transaction_match.group(1)
+            request_counter = 0  # Reset counter for new transaction
 
-        # If inserting, add Dynatrace headers before web_* calls
+        # INSERT: Add Dynatrace header before web_* calls
         if action == "INSERT" and any(keyword in line for keyword in ['web_url', 'web_submit_data', 'web_custom_request']):
-            step_name = extract_step_name(content, i)  # Get the step name
-            tsn_part = f"TSN={transaction_name};" if transaction_name else ""  # Include TSN if available
-            dynatrace_header = dynatrace_function_template.format(tsn=tsn_part, step_name=step_name, lsn_name=lsn_name)
-            new_content.append(dynatrace_header)  # Insert the Dynatrace header
-        
-        # If deleting, remove existing Dynatrace header calls
-        if action == "DELETE" and 'addDynatraceHeaderTest' in line:
-            continue  # Skip this line (remove it)
+            step_name = extract_step_name(content, i)
+            tsn_part = f"TSN={transaction_name};" if transaction_name else ""
 
-        new_content.append(line)  # Add the (possibly modified) line to new content
-        
-        # Check if this line ends a transaction
+            if include_transaction_name == "TRUE" and transaction_name:
+                request_counter += 1
+                step_name = f"{transaction_name}_C{request_counter:02d}_{step_name}"  # Format C01, C02, etc.
+
+            dynatrace_header = dynatrace_function_template.format(tsn=tsn_part, step_name=step_name, lsn_name=lsn_name)
+            new_content.append(dynatrace_header)
+
+        # DELETE: Remove Dynatrace header lines
+        if action == "DELETE" and 'addDynatraceHeaderTest' in line:
+            continue
+
+        new_content.append(line)
+
+        # Detect transaction end
         if re.search(r'lr_end_transaction\("([^"]+)"', line):
-            transaction_name = None  # Reset the transaction name
+            transaction_name = None
+            request_counter = 0  # Reset counter after transaction ends
 
     with open(file_path, 'w') as file:
-        file.writelines(new_content)  # Write the modified content back to the file
+        file.writelines(new_content)
+
 
 # Function to update the `global.h` file (add or remove the function definition)
 def update_global_h(global_h_path, action):
@@ -134,7 +144,7 @@ def update_global_h(global_h_path, action):
             file.truncate()
 
 # Process directory and subdirectories, but exclude 'data' folders
-def process_directory(directory_path, action):
+def process_directory(directory_path, action, include_transaction_name):
     for root, dirs, files in os.walk(directory_path):
         if 'data' in dirs:
             dirs.remove('data')  # Exclude 'data' folder from traversal
@@ -157,16 +167,18 @@ def process_directory(directory_path, action):
             # Process only .c files, excluding specified files
             if file.endswith('.c') and file not in excluded_files:
                 print(f'Processing {action}: {file_path}')
-                process_c_file(file_path, lsn_name, action)
+                process_c_file(file_path, lsn_name, action, include_transaction_name)
 
 
 # Main script execution starts here
-if len(sys.argv) < 3:
-    print("Usage: python patch_loadrunner.py <directory_path> <INSERT|DELETE>")
-    sys.exit(1)  # Exit if not enough arguments provided
+if len(sys.argv) < 4:
+    print("Usage: python patch_loadrunner.py <directory_path> <INSERT|DELETE> <TRUE|FALSE>")
+    sys.exit(1)
 
 directory_path = sys.argv[1]  # Get directory path from command-line arguments
 action = sys.argv[2].upper()  # Get action (INSERT/DELETE) and convert to uppercase
+include_transaction_name = sys.argv[3].upper()
+
 
 if action not in ["INSERT", "DELETE"]:  # Validate action
     print("Invalid action. Use INSERT or DELETE.")
@@ -176,10 +188,9 @@ if action not in ["INSERT", "DELETE"]:  # Validate action
 global_h_path = os.path.join(directory_path, "globals.h")
 if os.path.exists(global_h_path):
     print(f'Updating {action} in globals.h...')
-    update_global_h(global_h_path, action)
+    update_global_h(global_h_path, action, include_transaction_name)
 else:
     print(f"globals.h not found in {directory_path}, skipping...")
 
 # Process all `.c` files in the directory
-print(directory_path, action)
-process_directory(directory_path, action)
+process_directory(directory_path, action,include_transaction_name)
