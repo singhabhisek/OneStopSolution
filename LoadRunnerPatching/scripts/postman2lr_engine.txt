@@ -1,30 +1,30 @@
 import json
 from urllib.parse import urlparse
-import sys
 import os
+import sys
 
 def get_postman(path):
+    """Load the Postman collection JSON file."""
     with open(path, 'r', encoding='UTF-8') as postman_f:
-        result_dict = json.load(postman_f)
-        return result_dict
-
-#Your Postman collection JSON file goes here
+        return json.load(postman_f)
 
 # Read input parameters from command line
-input_file = sys.argv[1]  # Postman JSON file
-output_folder = sys.argv[2]  # Output folder where LoadRunner script will be saved
+input_file = sys.argv[1]  # JSON file provided directly
+output_folder = sys.argv[2]  # Output directory
+output_file_path = os.path.join(output_folder, os.path.splitext(os.path.basename(input_file))[0] + ".txt")
 
-output_file_path = os.path.join(output_folder, os.path.splitext(os.path.basename(input_file))[0] + ".lr")
-
-# Ensure output folder exists
-#os.makedirs(output_folder, exist_ok=True)
-
-# Load Postman collection data
+# Load Postman JSON data
 data = get_postman(input_file)
+requests_list = []
 
-#data=get_postman(sys.argv[1])
-names = ""
+# Flatten nested Postman collections
+for item in data.get('item', []):
+    if 'item' in item:
+        requests_list.extend(item['item'])  # Nested requests
+    else:
+        requests_list.append(item)
 
+# LoadRunner Templates
 c_web_set_user = """
     web_set_user("my_uname",
     "my_pwd",
@@ -52,126 +52,87 @@ c_post_request = """
         "URL=request_url",
         "Method=POST",
         "Resource=0",
-        "RecContentType=application/json",
+        "RecContentType=request_content_type",
         "Referer=",
         "Snapshot=snapshot_number.inf",
         "Mode=HTML",
-        "EncType=application/json",
+        "EncType=request_enc_type",
         "Body=request_body",
         LAST);
     """
 
-uname = ""
-pwdvalue = ""
-ictr=0
+# Process requests and generate LoadRunner script
+with open(output_file_path, 'w', encoding='UTF-8') as output_file:
+    request_counter = 0
 
-#Consolidation Dictionary for all items
-dicts = []
+    for request in requests_list:
+        request_counter += 1
+        web_header_code = ""
+        web_set_user_code = ""
+        get_request_code = ""
+        post_request_code = ""
 
+        # Process Authentication
+        auth = request["request"].get("auth", {})
+        parsed_url = urlparse(request["request"]["url"]["raw"])
 
-for x in range(len(data['item'])):
-    #handle the folders
-    try:
-        # px = data['item'][x]['item'];
-        #loop for multiple requests ina given folder
+        if auth.get("type") == "basic":
+            uname, pwd = "", ""
+            for entry in auth.get("basic", []):
+                if entry["key"] == "username":
+                    uname = entry["value"]
+                elif entry["key"] == "password":
+                    pwd = entry["value"]
+            
+            web_set_user_code = c_web_set_user.replace("my_uname", uname)\
+                                              .replace("my_pwd", pwd)\
+                                              .replace("my_url", parsed_url.netloc)\
+                                              .replace("my_port", "443" if parsed_url.scheme == "https" else "80")
 
-        for i in range(len(data['item'][x]['item'])):
-            names = (data['item'][x]['item'][i]);
-            #Append to the final dictionary
-            dicts.append(names)
+            output_file.write(web_set_user_code + "\n")
 
-    except KeyError:
-        px = (data['item'][x]);
-        names = px
-        # Append to the final dictionary
-        dicts.append(names)
+        elif auth.get("type") == "bearer":
+            token = auth["bearer"][0]["value"]
+            web_header_code = c_web_header.replace("my_key", "Authorization").replace("my_value", f"Bearer {token}")
+            output_file.write(web_header_code + "\n")
 
-# Generate LoadRunner script content
-loadrunner_script = ""
+        elif auth.get("type") == "apikey":
+            key = auth["apikey"][1]["value"]
+            value = auth["apikey"][0]["value"]
+            web_header_code = c_web_header.replace("my_key", key).replace("my_value", value)
+            output_file.write(web_header_code + "\n")
 
-#print(dicts)
-#traverse the final dictionary to create the result file
-for names in dicts:
-    ictr = ictr + 1
-    my_web_header = ""
+        # Process Headers
+        for header in request["request"].get("header", []):
+            web_header_code = c_web_header.replace("my_key", header["key"]).replace("my_value", header["value"])
+            output_file.write(web_header_code + "\n")
 
-    my_web_set_user = c_web_set_user
-    my_get_request = c_get_request
-    my_post_request = c_post_request
+        # Process GET Requests
+        if request["request"]["method"] == "GET":
+            get_request_code = c_get_request.replace("request_name", request["name"])\
+                                            .replace("request_url", request["request"]["url"]["raw"])\
+                                            .replace("snapshot_number", f"t{request_counter}")
 
-#        print(px["method"])
-   # Authentication part processing module
-    if "auth" in names["request"]:
+            output_file.write(f'   lr_start_transaction("{request["name"]}");\n')
+            output_file.write(get_request_code + "\n")
+            output_file.write(f'   lr_end_transaction("{request["name"]}", LR_AUTO);\n\n')
 
-        parsed = urlparse(names["request"]["url"]["raw"])
+        # Process POST Requests
+        elif request["request"]["method"] == "POST":
+            content_type = next((h["value"] for h in request["request"].get("header", []) if h["key"].lower() == "content-type"), "application/json")
+            enc_type = "application/json" if "json" in content_type.lower() else "text/xml"
 
-        if(names["request"]["auth"]["type"] == "basic"):
-            for values in (names["request"]["auth"]["basic"]):
-                if values["key"] == "password":
-                    pwdvalue = values["value"]
-                elif values["key"] == "username":
-                    uname = values["value"]
-            my_web_set_user = my_web_set_user.replace("my_uname", uname)
-            my_web_set_user = my_web_set_user.replace("my_pwd", pwdvalue)
-            my_web_set_user = my_web_set_user.replace("my_url", parsed.netloc)
-            my_web_set_user = my_web_set_user.replace("my_port",
-                                                      "443" if names["request"]["url"]["protocol"] == "https" else "80")
-            print(my_web_set_user)
+            body_data = request["request"].get("body", {}).get("raw", "").replace("\r\n", "").replace("\"", '\\\"')
 
-        if (names["request"]["auth"]["type"] == "bearer"):
-            my_web_header = c_web_header
-            my_web_header = my_web_header.replace("my_key", "Authorization")
-            my_web_header = my_web_header.replace("my_value", "Bearer " + names["request"]["auth"]["bearer"][0]["value"])
-            print(my_web_header)
+            post_request_code = c_post_request.replace("request_name", request["name"])\
+                                              .replace("request_url", request["request"]["url"]["raw"])\
+                                              .replace("snapshot_number", f"t{request_counter}")\
+                                              .replace("request_content_type", content_type)\
+                                              .replace("request_enc_type", enc_type)\
+                                              .replace("request_body", body_data)
 
-        if (names["request"]["auth"]["type"] == "apikey"):
-            my_web_header = c_web_header
-            my_web_header = my_web_header.replace("my_key", names["request"]["auth"]["apikey"][1]["value"])
-            my_web_header = my_web_header.replace("my_value",  names["request"]["auth"]["apikey"][0]["value"])
-            print(my_web_header)
+            output_file.write(f'   lr_start_transaction("{request["name"]}");\n')
+            output_file.write(post_request_code + "\n")
+            output_file.write(f'   lr_end_transaction("{request["name"]}", LR_AUTO);\n\n')
 
-    # Header Part processing module
-    if "header" in names["request"]:
-        for i in range(len(names["request"]["header"])):
-            my_web_header = c_web_header
-            my_web_header = my_web_header.replace("my_key", names["request"]["header"][i]["key"])
-            my_web_header = my_web_header.replace("my_value", names["request"]["header"][i]["value"])
-            print(my_web_header)
-    #
-    # # GET BODY REQUEST Handling
-    #
-    if names["request"]["method"] == "GET":
-        my_final_string = my_get_request
-        my_final_string = my_final_string.replace("request_name", names["name"])
-        my_final_string = my_final_string.replace("request_url", names["request"]["url"]["raw"])
-        my_final_string = my_final_string.replace("snapshot_number", "t" + str(ictr))
-
-        print("   lr_start_transaction(\"" + names["name"] + "\");")
-        print(my_final_string)
-        print("   lr_end_transaction(\"" + names["name"] + "\",LR_AUTO);" + "\n")
-    # #
-    # # # POST BODY REQUEST Handling
-    if names["request"]["method"] == "POST":
-        my_final_string = my_post_request
-        my_body_string = (names["request"]["body"]['raw'])
-        my_body_string = my_body_string.replace("\r\n", "")
-        my_body_string = my_body_string.replace("\"", '\\"')
-
-        my_final_string = my_final_string.replace("request_name", names["name"])
-        my_final_string = my_final_string.replace("request_url", names["request"]["url"]["raw"])
-        my_final_string = my_final_string.replace("snapshot_number", "t" + str(ictr))
-        my_final_string = my_final_string.replace("request_body", my_body_string)
-
-        # print("   lr_start_transaction(\"" + names["name"] + "\");")
-        # print(my_final_string)
-        # print("   lr_end_transaction(\"" + names["name"] + "\",LR_AUTO);" + "\n")
-
-        loadrunner_script += f'   lr_start_transaction("{names["name"]}");\n'
-        loadrunner_script += my_final_string + "\n"
-        loadrunner_script += f'   lr_end_transaction("{names["name"]}",LR_AUTO);\n\n'
-
-# Save output to file
-with open(output_file_path, "w", encoding="UTF-8") as output_file:
-    output_file.write(loadrunner_script)
-
-print(f"Conversion successful! LoadRunner script created: {os.path.basename(output_file_path)}")
+print(f"Processing complete. Output saved at: {output_file_path}")
